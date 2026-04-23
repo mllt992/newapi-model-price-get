@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import Database from 'better-sqlite3';
 import axios from 'axios';
+import cron from 'node-cron';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,12 +43,14 @@ db.exec(`
     synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_platform ON models(platform);
   CREATE INDEX IF NOT EXISTS idx_model_name ON models(model_name);
 `);
-
-app.use(express.json());
-app.use(express.static(join(__dirname, 'public')));
 
 // 同步 API
 const SYNC_APIS = {
@@ -64,15 +67,33 @@ const SYNC_APIS = {
   }
 };
 
+// 检查是否需要同步（距离上次同步是否超过6小时）
+function shouldSync(platform) {
+  const lastSync = db.prepare(`SELECT value FROM config WHERE key = ?`).get(`last_sync_${platform}`);
+  if (!lastSync) return true;
+
+  const lastTime = new Date(lastSync.value).getTime();
+  const now = Date.now();
+  const sixHours = 6 * 60 * 60 * 1000;
+
+  return (now - lastTime) > sixHours;
+}
+
+// 更新最后同步时间
+function updateSyncTime(platform) {
+  const now = new Date().toISOString();
+  db.prepare(`INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)`).run(`last_sync_${platform}`, now);
+}
+
 // 同步 SiliconFlow 数据
 async function syncSiliconFlow() {
   const config = SYNC_APIS.siliconflow;
-  console.log(`[${new Date().toISOString()}] 开始同步 SiliconFlow...`);
+  console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] 开始同步 SiliconFlow...`);
 
   try {
     const response = await axios.get(config.url, {
       headers: config.headers,
-      timeout: 60000
+      timeout: 120000
     });
 
     const data = response.data;
@@ -81,7 +102,7 @@ async function syncSiliconFlow() {
     }
 
     const models = data.data?.models || [];
-    let inserted = 0, updated = 0;
+    let count = 0;
 
     const stmt = db.prepare(`
       INSERT INTO models (platform, model_name, display_name, description, context_length,
@@ -124,12 +145,7 @@ async function syncSiliconFlow() {
           model.status || 'online',
           JSON.stringify({ modelId: model.modelId, tags: model.tags || [] })
         );
-
-        if (db.changes > 0) {
-          updated++;
-        } else {
-          inserted++;
-        }
+        count++;
       }
     });
 
@@ -137,14 +153,15 @@ async function syncSiliconFlow() {
 
     // 记录同步历史
     db.prepare(`INSERT INTO sync_history (platform, status, model_count) VALUES (?, 'success', ?)`)
-      .run('siliconflow', models.length);
+      .run('siliconflow', count);
+    updateSyncTime('siliconflow');
 
-    console.log(`[${new Date().toISOString()}] SiliconFlow 同步完成: ${models.length} 个模型`);
-    return { success: true, count: models.length };
+    console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] SiliconFlow 同步完成: ${count} 个模型`);
+    return { success: true, count };
 
   } catch (error) {
     const message = error.response?.data?.message || error.message;
-    console.error(`[${new Date().toISOString()}] SiliconFlow 同步失败:`, message);
+    console.error(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] SiliconFlow 同步失败:`, message);
 
     db.prepare(`INSERT INTO sync_history (platform, status, error_message) VALUES (?, 'failed', ?)`)
       .run('siliconflow', message);
@@ -155,10 +172,10 @@ async function syncSiliconFlow() {
 
 // 同步 models.dev 数据
 async function syncModelsDev() {
-  console.log(`[${new Date().toISOString()}] 开始同步 models.dev...`);
+  console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] 开始同步 models.dev...`);
 
   try {
-    const response = await axios.get(SYNC_APIS.modelsdev.url, { timeout: 60000 });
+    const response = await axios.get(SYNC_APIS.modelsdev.url, { timeout: 120000 });
     const data = response.data;
 
     let count = 0;
@@ -183,7 +200,7 @@ async function syncModelsDev() {
             fullName,
             modelName,
             '',
-            cost.input ? cost.input / 2 : null,  // 转换为 USD
+            cost.input ? cost.input / 2 : null,
             cost.output ? cost.output / cost.input : null,
             'USD',
             '/ M Tokens',
@@ -198,13 +215,14 @@ async function syncModelsDev() {
 
     db.prepare(`INSERT INTO sync_history (platform, status, model_count) VALUES (?, 'success', ?)`)
       .run('modelsdev', count);
+    updateSyncTime('modelsdev');
 
-    console.log(`[${new Date().toISOString()}] models.dev 同步完成: ${count} 个模型`);
+    console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] models.dev 同步完成: ${count} 个模型`);
     return { success: true, count };
 
   } catch (error) {
     const message = error.message;
-    console.error(`[${new Date().toISOString()}] models.dev 同步失败:`, message);
+    console.error(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] models.dev 同步失败:`, message);
 
     db.prepare(`INSERT INTO sync_history (platform, status, error_message) VALUES (?, 'failed', ?)`)
       .run('modelsdev', message);
@@ -235,11 +253,9 @@ app.get('/api/models', (req, res) => {
   const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
 
   try {
-    // 获取总数
     const countStmt = db.prepare(`SELECT COUNT(*) as total FROM models ${whereClause}`);
     const total = countStmt.get(...params).total;
 
-    // 分页查询
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const dataStmt = db.prepare(`SELECT * FROM models ${whereClause} ORDER BY ${sortField} ${sortOrder} LIMIT ? OFFSET ?`);
     const models = dataStmt.all(...params, parseInt(limit), offset);
@@ -265,17 +281,28 @@ app.get('/api/platforms', (req, res) => {
 
 // 同步接口
 app.post('/api/sync', async (req, res) => {
-  const { platform } = req.body;
+  const { platform, force = false } = req.body;
 
   try {
+    const results = [];
+
     if (platform === 'siliconflow' || !platform) {
-      await syncSiliconFlow();
-    }
-    if (platform === 'modelsdev' || !platform) {
-      await syncModelsDev();
+      if (force || shouldSync('siliconflow')) {
+        results.push(await syncSiliconFlow());
+      } else {
+        results.push({ success: true, message: 'SiliconFlow 数据更新于6小时内，跳过同步' });
+      }
     }
 
-    res.json({ success: true, message: '同步完成' });
+    if (platform === 'modelsdev' || !platform) {
+      if (force || shouldSync('modelsdev')) {
+        results.push(await syncModelsDev());
+      } else {
+        results.push({ success: true, message: 'models.dev 数据更新于6小时内，跳过同步' });
+      }
+    }
+
+    res.json({ success: true, data: results });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -293,7 +320,7 @@ app.get('/api/sync/history', (req, res) => {
   }
 });
 
-// 公开数据格式 (兼容 new-api 的 /api/ratio_config 格式)
+// 公开数据格式
 app.get('/api/ratio_config', (req, res) => {
   try {
     const models = db.prepare('SELECT * FROM models').all();
@@ -303,8 +330,6 @@ app.get('/api/ratio_config', (req, res) => {
 
     for (const m of models) {
       if (m.price_prompt !== null) {
-        // 转换为 ratio: ¥/M -> ratio
-        // factor = 500 / 7.3 / 1000 / 0.002 ≈ 34.246575
         modelRatio[m.model_name] = m.price_prompt * 34.246575;
       }
       if (m.price_completion !== null) {
@@ -358,24 +383,38 @@ app.get('/sync', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'sync.html'));
 });
 
-// 启动时自动同步
-async function init() {
-  console.log('正在初始化数据...');
-
+// 设置定时任务：每天凌晨0点同步
+cron.schedule('0 0 * * *', async () => {
+  console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] 执行定时同步任务...`);
   try {
     await syncSiliconFlow();
     await syncModelsDev();
-    console.log('初始化完成!');
+    console.log(`[${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}] 定时同步完成`);
   } catch (error) {
-    console.error('初始化同步失败:', error.message);
+    console.error('定时同步失败:', error.message);
   }
+}, {
+  timezone: 'Asia/Shanghai'
+});
 
-  app.listen(PORT, () => {
-    console.log(`\n🚀 服务已启动: http://localhost:${PORT}`);
-    console.log(`   - 模型列表: http://localhost:${PORT}/`);
-    console.log(`   - 同步管理: http://localhost:${PORT}/sync`);
-    console.log(`   - API 文档: http://localhost:${PORT}/api/models\n`);
-  });
-}
+// 启动
+app.listen(PORT, () => {
+  // 检查是否有数据
+  const count = db.prepare('SELECT COUNT(*) as count FROM models').get().count;
 
-init();
+  console.log(`\n🚀 AI模型价格同步站已启动`);
+  console.log(`   地址: http://localhost:${PORT}`);
+  console.log(`   - 模型列表: http://localhost:${PORT}/`);
+  console.log(`   - 同步管理: http://localhost:${PORT}/sync`);
+  console.log(`   - 数据库: ${count} 个模型`);
+
+  if (count === 0) {
+    console.log(`\n⚠️  数据库为空，正在进行首次同步...`);
+    syncSiliconFlow().then(() => syncModelsDev())
+      .then(() => console.log(`\n✅ 首次同步完成，共 ${db.prepare('SELECT COUNT(*) as count FROM models').get().count} 个模型`))
+      .catch(err => console.error('首次同步失败:', err.message));
+  } else {
+    console.log(`\n📊 数据缓存于 SQLite，每6小时自动更新`);
+    console.log(`   ⏰ 定时同步: 每天 00:00 (北京时间)`);
+  }
+});
