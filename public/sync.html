@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>同步管理 - AI模型价格同步站</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: #2563eb;
+      --color-primary-light: #dbeafe;
+      --color-success: #059669;
+      --color-danger: #dc2626;
+      --color-bg-page: #f8fafc;
+      --color-bg-hover: #f1f5f9;
+      --color-border: #e5e7eb;
+      --color-border-light: #f1f5f9;
+      --color-text-primary: #1f2937;
+      --color-text-secondary: #4b5563;
+      --color-text-tertiary: #9ca3af;
+      --color-text-muted: #9ca3af;
+      --color-text-inverse: #fff;
+      --radius: 4px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--color-bg-page);
+      min-height: 100vh;
+      color: var(--color-text-primary);
+      line-height: 1.4;
+      font-size: 12px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 12px; }
+
+    header {
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--color-border);
+    }
+
+    header h1 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .back-link {
+      color: var(--color-primary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .back-link:hover { color: #1d4ed8; }
+
+    .btn {
+      padding: 4px 10px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+    }
+
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid var(--color-border);
+    }
+
+    .card h2 {
+      font-size: 12px;
+      margin-bottom: 10px;
+      color: var(--color-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    .card h2::before {
+      content: '';
+      width: 2px;
+      height: 12px;
+      background: var(--color-primary);
+      border-radius: 1px;
+    }
+
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .platform-card {
+      background: var(--color-bg-hover);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 10px;
+    }
+
+    .platform-card h3 {
+      font-size: 12px;
+      margin-bottom: 2px;
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+    .platform-card > p {
+      color: var(--color-text-tertiary);
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+
+    .platform-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 8px;
+      padding: 6px;
+      background: #fff;
+      border-radius: var(--radius);
+      border: 1px solid var(--color-border-light);
+    }
+
+    .platform-stats span { text-align: center; }
+
+    .platform-stats .value {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-primary);
+      display: block;
+    }
+
+    .platform-stats .label {
+      font-size: 9px;
+      color: var(--color-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      font-weight: 600;
+    }
+
+    .sync-btn {
+      width: 100%;
+      padding: 6px;
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .sync-btn:hover:not(:disabled) { background: #1d4ed8; }
+    .sync-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .sync-btn.syncing { animation: pulse 1.5s infinite; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+    .history-table { width: 100%; border-collapse: collapse; }
+
+    .history-table th, .history-table td {
+      padding: 7px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .history-table th {
+      background: var(--color-bg-hover);
+      color: var(--color-text-tertiary);
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .history-table tr:hover td { background: var(--color-bg-hover); }
+
+    .status-success {
+      color: var(--color-success);
+      font-weight: 600;
+      font-size: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .status-success::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      background: var(--color-success);
+      border-radius: 50%;
+    }
+
+    .status-failed { color: var(--color-danger); font-weight: 600; font-size: 10px; }
+
+    .api-section {
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .api-section h3 {
+      font-size: 11px;
+      margin-bottom: 8px;
+      color: var(--color-text-primary);
+      font-weight: 700;
+    }
+
+    .api-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      background: var(--color-bg-hover);
+      border-radius: var(--radius);
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+    }
+
+    .api-item:hover { border-color: var(--color-border); background: #fff; }
+    .api-item:last-child { margin-bottom: 0; }
+
+    .api-item .method {
+      background: var(--color-success);
+      color: var(--color-text-inverse);
+      padding: 1px 6px;
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    .api-item .method.post { background: var(--color-primary); }
+
+    .api-item .path {
+      color: var(--color-text-primary);
+      font-family: monospace;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .api-item .desc { color: var(--color-text-tertiary); font-size: 10px; }
+
+    .platform-badge {
+      display: inline-flex;
+      padding: 2px 5px;
+      border-radius: 2px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .platform-badge.siliconflow { background: #dbeafe; color: #4338ca; }
+    .platform-badge.modelsdev { background: #d1fae5; color: #047857; }
+
+    @media (max-width: 768px) {
+      .container { padding: 8px; }
+      header { flex-direction: column; gap: 8px; text-align: center; }
+      .platform-grid { grid-template-columns: 1fr; }
+      .api-item { flex-direction: column; align-items: flex-start; gap: 3px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <a href="/" class="back-link">← 返回</a>
+        <h1>同步管理</h1>
+      </div>
+      <button class="btn btn-primary" onclick="syncAll()">同步所有平台</button>
+    </header>
+
+    <div class="card">
+      <h2>支持的平台</h2>
+      <div class="platform-grid">
+        <div class="platform-card">
+          <h3>SiliconFlow</h3>
+          <p>获取 SiliconFlow 平台所有模型的定价信息</p>
+          <div class="platform-stats">
+            <span>
+              <span class="value" id="sfCount">-</span>
+              <span class="label">模型数</span>
+            </span>
+            <span>
+              <span class="value" id="sfLastSync">-</span>
+              <span class="label">最后同步</span>
+            </span>
+          </div>
+          <button class="sync-btn" id="sfSyncBtn" onclick="syncPlatform('siliconflow')">同步 SiliconFlow</button>
+        </div>
+        <div class="platform-card">
+          <h3>models.dev</h3>
+          <p>获取 models.dev 平台所有模型的定价信息</p>
+          <div class="platform-stats">
+            <span>
+              <span class="value" id="mdCount">-</span>
+              <span class="label">模型数</span>
+            </span>
+            <span>
+              <span class="value" id="mdLastSync">-</span>
+              <span class="label">最后同步</span>
+            </span>
+          </div>
+          <button class="sync-btn" id="mdSyncBtn" onclick="syncPlatform('modelsdev')">同步 models.dev</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>同步历史</h2>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>平台</th>
+            <th>状态</th>
+            <th>模型数</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody id="historyList"></tbody>
+      </table>
+    </div>
+
+    <div class="api-section">
+      <h3>API 接口</h3>
+      <div class="api-item">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="method">GET</span>
+          <span class="path">/api/models</span>
+          <span class="desc">获取所有模型列表</span>
+        </div>
+      </div>
+      <div class="api-item">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="method">GET</span>
+          <span class="path">/api/platforms</span>
+          <span class="desc">获取平台统计</span>
+        </div>
+      </div>
+      <div class="api-item">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="method post">POST</span>
+          <span class="path">/api/sync</span>
+          <span class="desc">触发同步</span>
+        </div>
+      </div>
+      <div class="api-item">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="method">GET</span>
+          <span class="path">/api/ratio_config</span>
+          <span class="desc">兼容格式的费率数据</span>
+        </div>
+      </div>
+      <div class="api-item">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="method">GET</span>
+          <span class="path">/api/stats</span>
+          <span class="desc">获取统计数据</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      const pad = n => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (data.success) {
+          const byPlatform = {};
+          data.data.by_platform.forEach(p => byPlatform[p.platform] = p);
+          if (byPlatform.siliconflow) {
+            document.getElementById('sfCount').textContent = byPlatform.siliconflow.count;
+            document.getElementById('sfLastSync').textContent = byPlatform.siliconflow.last_sync ? formatDate(byPlatform.siliconflow.last_sync) : '-';
+          }
+          if (byPlatform.modelsdev) {
+            document.getElementById('mdCount').textContent = byPlatform.modelsdev.count;
+            document.getElementById('mdLastSync').textContent = byPlatform.modelsdev.last_sync ? formatDate(byPlatform.modelsdev.last_sync) : '-';
+          }
+        }
+      } catch (e) { console.error('Failed to load stats:', e); }
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/sync/history');
+        const data = await res.json();
+        if (data.success) {
+          const tbody = document.getElementById('historyList');
+          tbody.innerHTML = data.data.map(h => `
+            <tr>
+              <td style="color:var(--color-text-secondary)">${h.synced_at ? formatDate(h.synced_at) : '-'}</td>
+              <td><span class="platform-badge ${h.platform}">${h.platform === 'siliconflow' ? 'SF' : 'MD'}</span></td>
+              <td><span class="status-${h.status}">${h.status === 'success' ? '成功' : '失败'}</span></td>
+              <td>${h.model_count || '-'}</td>
+              <td style="color:var(--color-text-tertiary)">${h.error_message || '-'}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--color-text-muted)">暂无同步记录</td></tr>';
+        }
+      } catch (e) { console.error('Failed to load history:', e); }
+    }
+
+    async function syncPlatform(platform) {
+      const btn = document.getElementById(platform === 'siliconflow' ? 'sfSyncBtn' : 'mdSyncBtn');
+      btn.disabled = true;
+      btn.classList.add('syncing');
+      btn.textContent = '同步中...';
+      try {
+        const res = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform })
+        });
+        const data = await res.json();
+        if (data.success) { alert('同步成功'); loadStats(); loadHistory(); }
+        else { alert('同步失败: ' + data.error); }
+      } catch (e) { alert('同步失败'); }
+      btn.disabled = false;
+      btn.classList.remove('syncing');
+      btn.textContent = '同步 ' + (platform === 'siliconflow' ? 'SiliconFlow' : 'models.dev');
+    }
+
+    async function syncAll() {
+      if (!confirm('确定要同步所有平台吗？这可能需要几分钟时间。')) return;
+      document.getElementById('sfSyncBtn').disabled = true;
+      document.getElementById('mdSyncBtn').disabled = true;
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { alert('所有平台同步完成'); loadStats(); loadHistory(); }
+        else { alert('同步失败: ' + data.error); }
+      } catch (e) { alert('同步失败'); }
+      document.getElementById('sfSyncBtn').disabled = false;
+      document.getElementById('mdSyncBtn').disabled = false;
+    }
+
+    loadStats();
+    loadHistory();
+  </script>
+</body>
+</html>

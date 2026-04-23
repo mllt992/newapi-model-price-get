@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI模型价格同步站</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: #2563eb;
+      --color-primary-light: #dbeafe;
+      --color-success: #059669;
+      --color-danger: #dc2626;
+      --color-bg-page: #f8fafc;
+      --color-bg-hover: #f1f5f9;
+      --color-border: #e5e7eb;
+      --color-border-light: #f1f5f9;
+      --color-text-primary: #1f2937;
+      --color-text-secondary: #4b5563;
+      --color-text-tertiary: #9ca3af;
+      --color-text-muted: #9ca3af;
+      --color-text-inverse: #fff;
+      --radius: 4px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--color-bg-page);
+      min-height: 100vh;
+      color: var(--color-text-primary);
+      line-height: 1.4;
+      font-size: 12px;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 12px; }
+
+    header {
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--color-border);
+    }
+
+    header h1 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .header-actions { display: flex; gap: 6px; }
+
+    .btn {
+      padding: 4px 10px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--color-text-primary);
+      border: 1px solid var(--color-border);
+    }
+
+    .btn-secondary:hover { background: var(--color-bg-hover); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card {
+      background: #fff;
+      padding: 10px;
+      border-radius: var(--radius);
+      text-align: center;
+      border: 1px solid var(--color-border);
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .stat-card:nth-child(2) .stat-value { color: #6366f1; }
+    .stat-card:nth-child(3) .stat-value { color: var(--color-success); }
+    .stat-card:nth-child(4) .stat-value { color: #8b5cf6; }
+
+    .stat-label {
+      color: var(--color-text-tertiary);
+      margin-top: 2px;
+      font-size: 10px;
+    }
+
+    .filters {
+      background: #fff;
+      padding: 10px;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      border: 1px solid var(--color-border);
+    }
+
+    .search-box { flex: 1; min-width: 150px; }
+
+    .search-box input {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 11px;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    select {
+      padding: 5px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 11px;
+      background: #fff;
+    }
+
+    select:focus { outline: none; border-color: var(--color-primary); }
+
+    .currency-toggle {
+      display: flex;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .currency-toggle button {
+      padding: 5px 10px;
+      border: none;
+      background: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--color-text-secondary);
+    }
+
+    .currency-toggle button.active {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .currency-toggle button:hover:not(.active) { background: var(--color-bg-hover); }
+
+    .table-container {
+      background: #fff;
+      border-radius: var(--radius);
+      border: 1px solid var(--color-border);
+      overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    th {
+      background: var(--color-bg-hover);
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--color-border-light);
+      font-size: 11px;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--color-bg-hover); }
+
+    .platform-badge {
+      display: inline-flex;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .platform-badge.siliconflow { background: #dbeafe; color: #4338ca; }
+    .platform-badge.modelsdev { background: #d1fae5; color: #047857; }
+
+    .price { font-family: monospace; font-size: 11px; }
+
+    .status-online {
+      color: var(--color-success);
+      font-weight: 600;
+      font-size: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-online::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      background: var(--color-success);
+      border-radius: 50%;
+    }
+
+    .status-disable { color: var(--color-danger); font-weight: 600; font-size: 10px; }
+
+    .loading {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(248, 250, 252, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loading-content {
+      background: #fff;
+      padding: 16px 24px;
+      border-radius: var(--radius);
+      text-align: center;
+      border: 1px solid var(--color-border);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      background: #1f2937;
+      color: white;
+      font-size: 11px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transform: translateY(50px);
+      transition: transform 150ms;
+      z-index: 1001;
+    }
+
+    .toast.show { transform: translateY(0); }
+    .toast.error { background: var(--color-danger); }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 10px;
+      padding: 8px;
+    }
+
+    .pagination button {
+      padding: 4px 8px;
+      border: 1px solid var(--color-border);
+      background: #fff;
+      color: var(--color-text-primary);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .pagination button:hover:not(:disabled) {
+      background: var(--color-primary-light);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .pagination button.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: white;
+    }
+
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 1024px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 768px) {
+      .container { padding: 8px; }
+      header { flex-direction: column; gap: 8px; text-align: center; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+      .filters { flex-direction: column; }
+      .search-box, select, .currency-toggle { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI模型价格同步站</h1>
+      <div class="header-actions">
+        <div class="currency-toggle">
+          <button id="btnCNY" class="active" onclick="setCurrency('CNY')">¥ CNY</button>
+          <button id="btnUSD" onclick="setCurrency('USD')">$ USD</button>
+        </div>
+        <button class="btn btn-secondary" onclick="location.href='/sync'">同步管理</button>
+        <button class="btn btn-primary" onclick="syncAll()">同步数据</button>
+      </div>
+    </header>
+
+    <div class="stats" id="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="totalModels">-</div>
+        <div class="stat-label">总模型数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="siliconflowCount">-</div>
+        <div class="stat-label">SiliconFlow</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="modelsdevCount">-</div>
+        <div class="stat-label">models.dev</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="lastSync">-</div>
+        <div class="stat-label">最后同步</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索模型名称..." oninput="debounceSearch()">
+      </div>
+      <select id="platformFilter" onchange="loadModels()">
+        <option value="">全部平台</option>
+        <option value="siliconflow">SiliconFlow</option>
+        <option value="modelsdev">models.dev</option>
+      </select>
+      <select id="sortBy" onchange="loadModels()">
+        <option value="model_name">按名称</option>
+        <option value="price_prompt">按Prompt价格</option>
+        <option value="updated_at">按更新时间</option>
+      </select>
+      <select id="sortOrder" onchange="loadModels()">
+        <option value="asc">升序</option>
+        <option value="desc">降序</option>
+      </select>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>平台</th>
+            <th>模型名称</th>
+            <th>显示名称</th>
+            <th>上下文</th>
+            <th>Prompt</th>
+            <th>Completion</th>
+            <th>状态</th>
+            <th>更新时间</th>
+          </tr>
+        </thead>
+        <tbody id="modelList"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <div id="loading" class="loading" style="display:none">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div style="color: var(--color-text-secondary); font-size: 11px;">加载中...</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let currentPage = 1;
+    const pageSize = 50;
+    let totalModels = 0;
+    let searchTimeout = null;
+    let currentCurrency = 'CNY';
+    const EXCHANGE_RATE = 7.25; // 1 USD = 7.25 CNY
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      const pad = n => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function formatPrice(price, platform) {
+      if (price === null || price === undefined) return '-';
+      const sym = currentCurrency === 'CNY' ? '¥' : '$';
+      if (currentCurrency === 'CNY' && platform === 'modelsdev') {
+        return sym + (price * EXCHANGE_RATE).toFixed(2);
+      } else if (currentCurrency === 'USD' && platform === 'siliconflow') {
+        return sym + (price / EXCHANGE_RATE).toFixed(4);
+      }
+      return sym + price.toFixed(platform === 'modelsdev' ? 4 : 2);
+    }
+
+    function setCurrency(currency) {
+      currentCurrency = currency;
+      document.getElementById('btnCNY').classList.toggle('active', currency === 'CNY');
+      document.getElementById('btnUSD').classList.toggle('active', currency === 'USD');
+      loadModels();
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (data.success) {
+          totalModels = data.data.total_models;
+          document.getElementById('totalModels').textContent = totalModels;
+          const byPlatform = {};
+          data.data.by_platform.forEach(p => byPlatform[p.platform] = p.count);
+          document.getElementById('siliconflowCount').textContent = byPlatform.siliconflow || 0;
+          document.getElementById('modelsdevCount').textContent = byPlatform.modelsdev || 0;
+          const lastSyncTime = data.data.recent_sync?.[0]?.synced_at;
+          document.getElementById('lastSync').textContent = lastSyncTime ? formatDate(lastSyncTime) : '-';
+        }
+      } catch (e) { console.error('Failed to load stats:', e); }
+    }
+
+    async function loadModels() {
+      showLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: pageSize,
+          platform: document.getElementById('platformFilter').value,
+          search: document.getElementById('searchInput').value,
+          sort: document.getElementById('sortBy').value,
+          order: document.getElementById('sortOrder').value
+        });
+
+        const res = await fetch(`/api/models?${params}`);
+        const data = await res.json();
+
+        if (data.success) {
+          totalModels = data.total;
+          renderModels(data.data);
+          renderPagination(data.total);
+        }
+      } catch (e) {
+        showToast('加载失败', true);
+      }
+      showLoading(false);
+    }
+
+    function renderModels(models) {
+      const tbody = document.getElementById('modelList');
+      if (models.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--color-text-muted)">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = models.map(m => `
+        <tr>
+          <td><span class="platform-badge ${m.platform}">${m.platform === 'siliconflow' ? 'SF' : 'MD'}</span></td>
+          <td><code style="background:var(--color-bg-hover);padding:1px 4px;border-radius:2px;font-size:10px">${m.model_name}</code></td>
+          <td>${m.display_name || '-'}</td>
+          <td>${m.context_length ? m.context_length.toLocaleString() : '-'}</td>
+          <td class="price">${formatPrice(m.price_prompt, m.platform)}</td>
+          <td class="price">${formatPrice(m.price_completion, m.platform)}</td>
+          <td><span class="status-${m.status}">${m.status === 'online' ? '在线' : '禁用'}</span></td>
+          <td style="color:var(--color-text-tertiary)">${m.updated_at ? formatDate(m.updated_at) : '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderPagination(total) {
+      const totalPages = Math.ceil(total / pageSize);
+      const pagination = document.getElementById('pagination');
+
+      if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      let html = `<button onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`;
+
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `<button onclick="goPage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<button disabled>...</button>';
+        }
+      }
+
+      html += `<button onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>`;
+      pagination.innerHTML = html;
+    }
+
+    function goPage(page) {
+      currentPage = page;
+      loadModels();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        currentPage = 1;
+        loadModels();
+      }, 300);
+    }
+
+    async function syncAll() {
+      if (!confirm('确定要同步所有平台数据吗？')) return;
+
+      showLoading(true);
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('同步成功');
+          loadStats();
+          loadModels();
+        } else {
+          showToast(data.error || '同步失败', true);
+        }
+      } catch (e) {
+        showToast('同步失败', true);
+      }
+      showLoading(false);
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').style.display = show ? 'flex' : 'none';
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'toast' + (isError ? ' error' : '');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    loadStats();
+    loadModels();
+  </script>
+</body>
+</html>
